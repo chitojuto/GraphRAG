@@ -1,0 +1,16 @@
+numpy
+openai
+pydantic
+pymupdf
+requests
+
+[app]
+langchain
+langchain-openai
+
+[dense]
+sentence-transformers
+faiss-cpu
+
+[graph]
+networkx

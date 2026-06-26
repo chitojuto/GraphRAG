@@ -1,0 +1,28 @@
+[project]
+name = "sct-project-graphrag"
+version = "0.1.0"
+description = "Samsung C&T practical GraphRAG course project scaffold"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "openai",
+  "pydantic",
+  "pymupdf",
+  "requests",
+]
+
+[project.optional-dependencies]
+dense = [
+  "sentence-transformers",
+  "faiss-cpu",
+]
+graph = [
+  "networkx",
+]
+app = [
+  "langchain",
+  "langchain-openai",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

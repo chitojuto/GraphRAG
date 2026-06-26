@@ -1,0 +1,10 @@
+{
+  "source": "https://www.notion.so/new-eTL-24879163a10d81719382d662da6bd9ac",
+  "pages": 86,
+  "blocks": 3717,
+  "outputs": {
+    "markdown": "/Users/ylee/Desktop/sct-project-graphrag/data_etl/markdown",
+    "html": "/Users/ylee/Desktop/sct-project-graphrag/data_etl/html",
+    "pdf_pages": "/Users/ylee/Desktop/sct-project-graphrag/data_etl/processed/pdf_pages.jsonl"
+  }
+}

@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: sct-project-graphrag
+Version: 0.1.0
+Summary: Samsung C&T practical GraphRAG course project scaffold
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: openai
+Requires-Dist: pydantic
+Requires-Dist: pymupdf
+Requires-Dist: requests
+Provides-Extra: dense
+Requires-Dist: sentence-transformers; extra == "dense"
+Requires-Dist: faiss-cpu; extra == "dense"
+Provides-Extra: graph
+Requires-Dist: networkx; extra == "graph"
+Provides-Extra: app
+Requires-Dist: langchain; extra == "app"
+Requires-Dist: langchain-openai; extra == "app"
