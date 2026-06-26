@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>eTL Guide Graph Explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101214;
+      --panel: #171b20;
+      --panel-2: #20262d;
+      --text: #e8edf2;
+      --muted: #98a3ad;
+      --line: #303841;
+      --accent: #5bc0eb;
+      --document: #7bd88f;
+      --topic: #f7b267;
+      --concept: #66c2ff;
+      --fact: #ff8fab;
+      --evidence: #d0a2f7;
+      --outcome: #ffd166;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { display: grid; grid-template-columns: 360px 1fr 380px; overflow: hidden; }
+
+    aside, section { min-width: 0; min-height: 0; }
+    .left, .right { background: var(--panel); border-color: var(--line); overflow: auto; }
+    .left { border-right: 1px solid var(--line); padding: 18px; }
+    .right { border-left: 1px solid var(--line); padding: 18px; }
+    .main { position: relative; min-width: 0; }
+    #container { position: absolute; inset: 0; background: radial-gradient(circle at 30% 20%, #1c2630 0, #101214 42%); }
+
+    h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: 0; }
+    h2 { font-size: 13px; margin: 22px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0; }
+    p { margin: 7px 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; }
+    input[type="search"], input[type="number"], select {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .checks { display: grid; gap: 8px; margin-top: 8px; }
+    .checks label { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 13px; }
+    .checks input { accent-color: var(--accent); }
+
+    button {
+      width: 100%;
+      margin-top: 12px;
+      background: #2a8db8;
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button:hover { filter: brightness(1.08); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 10px; }
+    .stat strong { display: block; font-size: 18px; }
+    .stat span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+    .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .chip { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 99px; flex: 0 0 auto; }
+
+    #results { margin-top: 12px; display: grid; gap: 7px; }
+    .result {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 9px 10px;
+      cursor: pointer;
+    }
+    .result:hover { border-color: var(--accent); }
+    .result .label { font-size: 13px; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
+    .result .meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+    .topbar {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      z-index: 3;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      pointer-events: none;
+    }
+    .pill {
+      background: rgba(16, 18, 20, .78);
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--text);
+      backdrop-filter: blur(10px);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      pointer-events: auto;
+    }
+
+    .detail-title { font-size: 16px; line-height: 1.45; margin: 0 0 8px; overflow-wrap: anywhere; }
+    .kv { border-top: 1px solid var(--line); padding: 10px 0; }
+    .kv .k { color: var(--muted); font-size: 11px; margin-bottom: 4px; text-transform: uppercase; }
+    .kv .v { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .neighbors { display: grid; gap: 6px; }
+    .neighbor { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; cursor: pointer; }
+    .neighbor:hover { color: var(--text); border-color: var(--accent); }
+
+    @media (max-width: 1100px) {
+      body { grid-template-columns: 320px 1fr; }
+      .right { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="left">
+    <h1>eTL Guide Graph</h1>
+    <p>Search an eTL guide topic, then render its local neighborhood.</p>
+
+    <div class="stats">
+      <div class="stat"><strong id="nodeCount">-</strong><span>nodes</span></div>
+      <div class="stat"><strong id="edgeCount">-</strong><span>edges</span></div>
+    </div>
+
+    <h2>Search</h2>
+    <input id="search" type="search" value="과제 추가하기" placeholder="과제, 퀴즈, 동영상 출결, 메시지..." />
+    <label for="typeFilter">Node type</label>
+    <select id="typeFilter">
+      <option value="">All types</option>
+      <option>Document</option>
+      <option>Topic</option>
+      <option>Screen</option>
+      <option>Task</option>
+      <option>Setting</option>
+      <option>Outcome</option>
+    </select>
+
+    <div class="row">
+      <div>
+        <label for="depth">Depth</label>
+        <input id="depth" type="number" min="1" max="4" value="2" />
+      </div>
+      <div>
+        <label for="maxNodes">Max nodes</label>
+        <input id="maxNodes" type="number" min="20" max="900" value="260" />
+      </div>
+    </div>
+
+    <h2>Relations</h2>
+    <div class="checks" id="relationChecks"></div>
+
+    <button id="renderBtn">Render Neighborhood</button>
+    <button class="secondary" id="resetBtn">Reset Camera</button>
+
+    <h2>Legend</h2>
+    <div class="legend" id="legend"></div>
+
+    <h2>Matches</h2>
+    <div id="results"></div>
+  </aside>
+
+  <main class="main">
+    <div id="container"></div>
+    <div class="topbar">
+      <div class="pill" id="subgraphStats">No subgraph rendered</div>
+      <div class="pill">Scroll to zoom · drag to pan · click node for detail</div>
+    </div>
+  </main>
+
+  <section class="right">
+    <h2>Selected Node</h2>
+    <div id="details"><p>Click a node or a search result.</p></div>
+    <h2>Visible Neighbors</h2>
+    <div class="neighbors" id="neighbors"></div>
+  </section>
+
+  <script id="graph-data" type="application/json">{"nodes": [{"id": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "label": "서울대학교 new eTL 상세 가이드 (교수자용)", "type": "Document", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "guide_area": "공통", "target_users": ["교수자", "조교"], "source_path": ""}, {"id": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "label": "new eTL에서 과목 강의실을 처음 설정하려면 무엇부터 해야 하나요?", "type": "Topic", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "topic_index": 0, "document_title": "서울대학교 new eTL 상세 가이드 (교수자용)", "guide_area": "공통", "target_users": ["교수자", "조교"], "user_question": "new eTL에서 과목 강의실을 처음 설정하려면 무엇부터 해야 하나요?", "task": "과목 강의실 기본 설정 및 메뉴 구성", "screen_path": ["과목 강의실", "과목 홈", "과목 메뉴 설정하기"], "procedure": ["과목 강의실의 첫 화면인 과목 홈을 확인한다", "과목에 필요한 메뉴 구성을 설정한다", "과목 운영에 맞게 강의실 환경을 정리한다"], "settings": ["과목 홈", "과목 메뉴", "과목 운영"], "cautions": ["세부 설정값은 연결된 하위 가이드를 따라야 한다", "과목마다 노출할 메뉴가 다를 수 있다"], "expected_result": "과목별 온라인 강의실 화면과 메뉴 구성이 완료된다."}, {"id": "Outcome::과목별 온라인 강의실 화면과 메뉴 구성이 완료된다", "label": "과목별 온라인 강의실 화면과 메뉴 구성이 완료된다", "type": "Outcome"}, {"id": "screen::과목 강의실", "label": "과목 강의실", "type": "Screen"}, {"id": "screen::과목 홈", "label": "과목 홈", "type": "Screen"}, {"id": "screen::과목 메뉴 설정하기", "label": "과목 메뉴 설정하기", "type": "Screen"}, {"id": "task::과목 강의실 기본 설정", "label": "과목 강의실 기본 설정", "type": "Task"}, {"id": "task::메뉴 구성 설정", "label": "메뉴 구성 설정", "type": "Task"}, {"id": "task::강의실 환경 정리", "label": "강의실 환경 정리", "type": "Task"}, {"id": "setting::과목 홈", "label": "과목 홈", "type": "Setting"}, {"id": "setting::과목 메뉴", "label": "과목 메뉴", "type": "Setting"}, {"id": "setting::과목 운영", "label": "과목 운영", "type": "Setting"}, {"id": "Document::001_FAQ_모음.md", "label": "FAQ 모음", "type": "Document", "document_id": "001_FAQ_모음.md", "guide_area": "공통", "target_users": ["공통"], "source_path": ""}, {"id": "Topic::001_FAQ_모음.md::0", "label": "FAQ 모음에서 과제, 토론, 퀴즈 같은 주제별 안내 문서를 어떻게 찾을 수 있나요?", "type": "Topic", "document_id": "001_FAQ_모음.md", "topic_index": 0, "document_title": "FAQ 모음", "guide_area": "공통", "target_users": ["공통"], "user_question": "FAQ 모음에서 과제, 토론, 퀴즈 같은 주제별 안내 문서를 어떻게 찾을 수 있나요?", "task": "FAQ 주제별 문서로 이동", "screen_path": ["FAQ 모음", "과제/토론/퀴즈/학습 자료/사용자/시험/알림 링크"], "procedure": ["FAQ 모음에서 원하는 주제의 링크를 확인한다", "해당 주제 링크를 클릭해 세부 가이드를 연다"], "settings": ["과제", "토론", "퀴즈", "학습 자료", "사용자", "시험", "알림"], "cautions": ["이 문서는 개별 기능 설명이 아니라 주제별 FAQ 링크 목록이다", "원문에 각 주제의 세부 절차는 포함되어 있지 않다"], "expected_result": "선택한 주제의 상세 가이드 문서로 이동할 수 있다."}, {"id": "Outcome::선택한 주제의 상세 가이드 문서로 이동할 수 있다", "label": "선택한 주제의 상세 가이드 문서로 이동할 수 있다", "type": "Outcome"}, {"id": "screen::FAQ 모음", "label": "FAQ 모음", "type": "Screen"}, {"id": "screen::과제/토론/퀴즈/학습 자료/사용자/시험/알림 링크", "label": "과제/토론/퀴즈/학습 자료/사용자/시험/알림 링크", "type": "Screen"}, {"id": "task::주제별 안내 문서 찾기", "label": "주제별 안내 문서 찾기", "type": "Task"}, {"id": "task::원하는 주제 링크 클릭", "label": "원하는 주제 링크 클릭", "type": "Task"}, {"id": "task::세부 가이드 열기", "label": "세부 가이드 열기", "type": "Task"}, {"id": "setting::과제", "label": "과제", "type": "Setting"}, {"id": "setting::토론", "label": "토론", "type": "Setting"}, {"id": "setting::퀴즈", "label": "퀴즈", "type": "Setting"}, {"id": "setting::학습 자료", "label": "학습 자료", "type": "Setting"}, {"id": "setting::사용자", "label": "사용자", "type": "Setting"}, {"id": "setting::시험", "label": "시험", "type": "Setting"}, {"id": "setting::알림", "label": "알림", "type": "Setting"}, {"id": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "label": "조교나 청강생을 수동으로 등록하려면 어디에서 처리하나요?", "type": "Topic", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "topic_index": 1, "document_title": "서울대학교 new eTL 상세 가이드 (교수자용)", "guide_area": "공통", "target_users": ["교수자", "조교"], "user_question": "조교나 청강생을 수동으로 등록하려면 어디에서 처리하나요?", "task": "사용자 수동 등록", "screen_path": ["시작하기", "사용자(조교, 청강생) 수동 등록"], "procedure": ["사용자 등록 관련 안내 페이지를 연다", "조교 또는 청강생을 수동 등록하는 절차를 따른다", "등록 결과를 확인한다"], "settings": ["사용자 유형", "조교", "청강생"], "cautions": ["원문에는 세부 입력값이 없으므로 추가 필드를 추정하지 않는다", "사용자 유형을 잘못 선택하지 않도록 주의한다"], "expected_result": "선택한 사용자가 해당 과목에 조교 또는 청강생으로 등록된다."}, {"id": "Outcome::선택한 사용자가 해당 과목에 조교 또는 청강생으로 등록된다", "label": "선택한 사용자가 해당 과목에 조교 또는 청강생으로 등록된다", "type": "Outcome"}, {"id": "screen::시작하기", "label": "시작하기", "type": "Screen"}, {"id": "screen::사용자(조교, 청강생) 수동 등록", "label": "사용자(조교, 청강생) 수동 등록", "type": "Screen"}, {"id": "screen::사용자 등록 관련 안내 페이지", "label": "사용자 등록 관련 안내 페이지", "type": "Screen"}, {"id": "task::조교 또는 청강생을 수동 등록", "label": "조교 또는 청강생을 수동 등록", "type": "Task"}, {"id": "task::사용자 등록 관련 안내 페이지를 열기", "label": "사용자 등록 관련 안내 페이지를 열기", "type": "Task"}, {"id": "task::등록 결과 확인", "label": "등록 결과 확인", "type": "Task"}, {"id": "setting::사용자 유형", "label": "사용자 유형", "type": "Setting"}, {"id": "setting::조교", "label": "조교", "type": "Setting"}, {"id": "setting::청강생", "label": "청강생", "type": "Setting"}, {"id": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "label": "공지, 쪽지, 문자, 메일 같은 수강생 알림은 어떻게 보내나요?", "type": "Topic", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "topic_index": 2, "document_title": "서울대학교 new eTL 상세 가이드 (교수자용)", "guide_area": "공통", "target_users": ["교수자", "조교"], "user_question": "공지, 쪽지, 문자, 메일 같은 수강생 알림은 어떻게 보내나요?", "task": "공지 및 수강생 알림 발송", "screen_path": ["공지/수강생 알림", "공지사항(공지, 쪽지, 문자, 메일) 안내", "공지", "수강생 알림"], "procedure": ["알림 종류에 맞는 안내 문서를 연다", "공지 또는 수강생 알림 기능을 선택한다", "전달할 내용을 작성하고 발송한다"], "settings": ["공지", "쪽지", "문자", "메일"], "cautions": ["알림 종류별 전달 범위와 방식이 다를 수 있다", "세부 발송 조건은 원문에 없으므로 임의로 확장하지 않는다"], "expected_result": "선택한 방식으로 수강생에게 공지나 알림이 전달된다."}, {"id": "Outcome::선택한 방식으로 수강생에게 공지나 알림이 전달된다", "label": "선택한 방식으로 수강생에게 공지나 알림이 전달된다", "type": "Outcome"}, {"id": "screen::공지/수강생 알림", "label": "공지/수강생 알림", "type": "Screen"}, {"id": "screen::공지사항(공지, 쪽지, 문자, 메일) 안내", "label": "공지사항(공지, 쪽지, 문자, 메일) 안내", "type": "Screen"}, {"id": "screen::공지", "label": "공지", "type": "Screen"}, {"id": "screen::수강생 알림", "label": "수강생 알림", "type": "Screen"}, {"id": "task::공지 또는 수강생 알림 기능 선택", "label": "공지 또는 수강생 알림 기능 선택", "type": "Task"}, {"id": "task::전달할 내용 작성", "label": "전달할 내용 작성", "type": "Task"}, {"id": "task::알림 발송", "label": "알림 발송", "type": "Task"}, {"id": "setting::공지", "label": "공지", "type": "Setting"}, {"id": "setting::쪽지", "label": "쪽지", "type": "Setting"}, {"id": "setting::문자", "label": "문자", "type": "Setting"}, {"id": "setting::메일", "label": "메일", "type": "Setting"}, {"id": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "label": "게시판을 만들고 게시글을 작성하거나 관리하려면 어떻게 하나요?", "type": "Topic", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "topic_index": 3, "document_title": "서울대학교 new eTL 상세 가이드 (교수자용)", "guide_area": "공통", "target_users": ["교수자", "조교"], "user_question": "게시판을 만들고 게시글을 작성하거나 관리하려면 어떻게 하나요?", "task": "게시판 생성 및 게시글 관리", "screen_path": ["게시판", "게시판 생성하기", "게시글 작성하기", "게시글 관리하기"], "procedure": ["게시판 관련 메뉴로 이동한다", "새 게시판을 생성한다", "게시글을 작성한다", "필요 시 게시글을 수정하거나 관리한다"], "settings": ["게시판", "게시글"], "cautions": ["게시판 생성과 게시글 관리는 서로 다른 단계이므로 혼동하지 않는다", "원문에 없는 권한 설정이나 세부 옵션은 추정하지 않는다"], "expected_result": "과목 내에 게시판이 생성되고 게시글을 운영할 수 있다."}, {"id": "Outcome::과목 내에 게시판이 생성되고 게시글을 운영할 수 있다", "label": "과목 내에 게시판이 생성되고 게시글을 운영할 수 있다", "type": "Outcome"}, {"id": "screen::게시판", "label": "게시판", "type": "Screen"}, {"id": "screen::게시판 생성하기", "label": "게시판 생성하기", "type": "Screen"}, {"id": "screen::게시글 작성하기", "label": "게시글 작성하기", "type": "Screen"}, {"id": "screen::게시글 관리하기", "label": "게시글 관리하기", "type": "Screen"}, {"id": "task::게시판 생성", "label": "게시판 생성", "type": "Task"}, {"id": "task::게시글 작성", "label": "게시글 작성", "type": "Task"}, {"id": "task::게시글 수정", "label": "게시글 수정", "type": "Task"}, {"id": "task::게시글 관리", "label": "게시글 관리", "type": "Task"}, {"id": "setting::게시판", "label": "게시판", "type": "Setting"}, {"id": "setting::게시글", "label": "게시글", "type": "Setting"}, {"id": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "label": "과제, 퀴즈, 토론, 파일, 화상강의, 출결 같은 학습 활동은 어떻게 추가하나요?", "type": "Topic", "document_id": "000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "topic_index": 4, "document_title": "서울대학교 new eTL 상세 가이드 (교수자용)", "guide_area": "공통", "target_users": ["교수자", "조교"], "user_question": "과제, 퀴즈, 토론, 파일, 화상강의, 출결 같은 학습 활동은 어떻게 추가하나요?", "task": "모듈 또는 주차학습에 학습 활동/요소 추가", "screen_path": ["모듈(주차학습)", "학습 활동 - 과제 추가하기", "학습 활동 - 퀴즈 추가하기", "학습 활동 - 토론 추가하기", "학습 활동 - 파일 추가하기", "학습 요소 - 화상강의 추가하기", "학습 활동 - 오프라인 출결(수동 출결)"], "procedure": ["주차학습 또는 모듈 구성 화면으로 이동한다", "추가하려는 학습 활동 또는 학습 요소를 선택한다", "각 활동에 맞는 설정을 입력하고 저장한다"], "settings": ["과제", "퀴즈", "토론", "파일", "화상강의", "오프라인 출결"], "cautions": ["과제와 퀴즈, 토론은 각각 별도 가이드가 있으므로 구분해서 설정한다", "출결은 오프라인 수동 출결 항목을 별도로 확인해야 한다"], "expected_result": "모듈 또는 주차학습 안에 원하는 학습 활동과 요소가 추가된다."}, {"id": "Outcome::모듈 또는 주차학습 안에 원하는 학습 활동과 요소가 추가된다", "label": "모듈 또는 주차학습 안에 원하는 학습 활동과 요소가 추가된다", "type": "Outcome"}, {"id": "screen::모듈(주차학습", "label": "모듈(주차학습", "type": "Screen"}, {"id": "screen::학습 활동 - 과제 추가하기", "label": "학습 활동 - 과제 추가하기", "type": "Screen"}, {"id": "screen::학습 활동 - 퀴즈 추가하기", "label": "학습 활동 - 퀴즈 추가하기", "type": "Screen"}, {"id": "screen::학습 활동 - 토론 추가하기", "label": "학습 활동 - 토론 추가하기", "type": "Screen"}, {"id": "screen::학습 활동 - 파일 추가하기", "label": "학습 활동 - 파일 추가하기", "type": "Screen"}, {"id": "screen::학습 요소 - 화상강의 추가하기", "label": "학습 요소 - 화상강의 추가하기", "type": "Screen"}, {"id": "screen::학습 활동 - 오프라인 출결(수동 출결", "label": "학습 활동 - 오프라인 출결(수동 출결", "type": "Screen"}, {"id": "task::모듈 또는 주차학습에 학습 활동/요소 추가", "label": "모듈 또는 주차학습에 학습 활동/요소 추가", "type": "Task"}, {"id": "task::추가하려는 학습 활동 또는 학습 요소 선택", "label": "추가하려는 학습 활동 또는 학습 요소 선택", "type": "Task"}, {"id": "task::각 활동에 맞는 설정 입력", "label": "각 활동에 맞는 설정 입력", "type": "Task"}, {"id": "task::저장", "label": "저장", "type": "Task"}, {"id": "setting::파일", "label": "파일", "type": "Setting"}, {"id": "setting::화상강의", "label": "화상강의", "type": "Setting"}, {"id": "setting::오프라인 출결", "label": "오프라인 출결", "type": "Setting"}, {"id": "Document::002_과제.md", "label": "과제", "type": "Document", "document_id": "002_과제.md", "guide_area": "과제", "target_users": ["교수자", "조교"], "source_path": ""}, {"id": "Topic::002_과제.md::0", "label": "오프라인 과제나 시험 점수를 new eTL에 입력하려면 어떻게 하나요?", "type": "Topic", "document_id": "002_과제.md", "topic_index": 0, "document_title": "과제", "guide_area": "과제", "target_users": ["교수자", "조교"], "user_question": "오프라인 과제나 시험 점수를 new eTL에 입력하려면 어떻게 하나요?", "task": "오프라인 과제/시험 점수 입력", "screen_path": ["과제 관련 화면", "성적 입력"], "procedure": ["오프라인 과제 또는 시험 점수를 입력할 기능으로 이동한다", "대상 학생의 점수를 입력한다", "입력 내용을 저장한다"], "settings": ["학생별 점수", "과제 또는 시험 항목"], "cautions": ["원문에는 구체적인 메뉴명과 입력 방식이 제시되지 않는다", "세부 절차는 연결된 하위 문서를 확인해야 한다"], "expected_result": "학생별 오프라인 과제 또는 시험 점수가 new eTL에 반영된다."}, {"id": "Outcome::학생별 오프라인 과제 또는 시험 점수가 new eTL에 반영된다", "label": "학생별 오프라인 과제 또는 시험 점수가 new eTL에 반영된다", "type": "Outcome"}, {"id": "screen::과제 관련 화면", "label": "과제 관련 화면", "type": "Screen"}, {"id": "screen::성적 입력", "label": "성적 입력", "type": "Screen"}, {"id": "task::오프라인 과제/시험 점수 입력", "label": "오프라인 과제/시험 점수 입력", "type": "Task"}, {"id": "task::대상 학생의 점수 입력", "label": "대상 학생의 점수 입력", "type": "Task"}, {"id": "task::입력 내용 저장", "label": "입력 내용 저장", "type": "Task"}, {"id": "setting::학생별 점수", "label": "학생별 점수", "type": "Setting"}, {"id": "setting::과제 또는 시험 항목", "label": "과제 또는 시험 항목", "type": "Setting"}, {"id": "Topic::002_과제.md::2", "label": "피어리뷰 과제에서 학생별 완료 여부와 미완료 여부를 어떻게 확인하나요?", "type": "Topic", "document_id": "002_과제.md", "topic_index": 2, "document_title": "과제", "guide_area": "과제", "target_users": ["교수자", "조교"], "user_question": "피어리뷰 과제에서 학생별 완료 여부와 미완료 여부를 어떻게 확인하나요?", "task": "피어리뷰 과제 완료/미완료 상태 확인", "screen_path": ["과제", "피어리뷰", "학생별 상태 확인"], "procedure": ["피어리뷰 과제의 상태 확인 화면으로 이동한다", "학생별 완료 여부를 확인한다", "미완료 학생을 구분해 확인한다"], "settings": ["완료", "미완료", "학생별 상태"], "cautions": ["원문에는 구체적인 화면 경로나 필터 조건이 없다", "완료 기준은 피어리뷰 과제 설정에 따라 달라질 수 있다"], "expected_result": "피어리뷰 과제에 대해 학생별 완료 및 미완료 상태를 확인할 수 있다."}, {"id": "Outcome::피어리뷰 과제의 학생별 완료 및 미완료 상태를 확인할 수 있다", "label": "피어리뷰 과제의 학생별 완료 및 미완료 상태를 확인할 수 있다", "type": "Outcome"}, {"id": "screen::과제", "label": "과제", "type": "Screen"}, {"id": "screen::피어리뷰", "label": "피어리뷰", "type": "Screen"}, {"id": "screen::학생별 상태 확인", "label": "학생별 상태 확인", "type": "Screen"}, {"id": "screen::상태 확인 화면", "label": "상태 확인 화면", "type": "Screen"}, {"id": "task::피어리뷰 과제 완료/미완료 상태 확인", "label": "피어리뷰 과제 완료/미완료 상태 확인", "type": "Task"}, {"id": "task::학생별 완료 여부 확인", "label": "학생별 완료 여부 확인", "type": "Task"}, {"id": "task::미완료 학생 구분", "label": "미완료 학생 구분", "type": "Task"}, {"id": "setting::완료", "label": "완료", "type": "Setting"}, {"id": "setting::미완료", "label": "미완료", "type": "Setting"}, {"id": "setting::학생별 상태", "label": "학생별 상태", "type": "Setting"}, {"id": "Topic::002_과제.md::1", "label": "과제 제출물을 한 번에 다운로드할 수 없을 때 어떻게 하나요?", "type": "Topic", "document_id": "002_과제.md", "topic_index": 1, "document_title": "과제", "guide_area": "과제", "target_users": ["교수자", "조교"], "user_question": "과제 제출물을 한 번에 다운로드할 수 없을 때 어떻게 하나요?", "task": "과제 제출물 일괄 다운로드 문제 확인", "screen_path": ["과제", "제출물 다운로드"], "procedure": ["과제 제출물 다운로드 기능을 확인한다", "일괄 다운로드가 제한되는 조건이 있는지 검토한다", "필요한 경우 개별 다운로드 또는 다른 안내 절차를 따른다"], "settings": ["제출물 다운로드", "일괄 다운로드"], "cautions": ["원문은 '불가합니다'라는 문제 상황만 제시하며 해결 방법은 포함하지 않는다", "다운로드 가능 여부는 과제 설정이나 제출 상태에 따라 달라질 수 있다"], "expected_result": "과제 제출물 다운로드 가능 여부와 대안 절차를 확인할 수 있다."}, {"id": "Outcome::과제 제출물 다운로드 가능 여부와 대안 절차를 확인할 수 있다", "label": "과제 제출물 다운로드 가능 여부와 대안 절차를 확인할 수 있다", "type": "Outcome"}, {"id": "screen::제출물 다운로드", "label": "제출물 다운로드", "type": "Screen"}, {"id": "task::과제 제출물 일괄 다운로드 문제 확인", "label": "과제 제출물 일괄 다운로드 문제 확인", "type": "Task"}, {"id": "task::과제 제출물 다운로드 기능 확인", "label": "과제 제출물 다운로드 기능 확인", "type": "Task"}, {"id": "task::일괄 다운로드 제한 조건 검토", "label": "일괄 다운로드 제한 조건 검토", "type": "Task"}, {"id": "task::개별 다운로드 또는 다른 안내 절차 확인", "label": "개별 다운로드 또는 다른 안내 절차 확인", "type": "Task"}, {"id": "setting::제출물 다운로드", "label": "제출물 다운로드", "type": "Setting"}, {"id": "setting::일괄 다운로드", "label": "일괄 다운로드", "type": "Setting"}, {"id": "Document::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "label": "오프라인 과제/시험 점수를 new eTL에 입력하기", "type": "Document", "document_id": "003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "guide_area": "과제, 시험, 성적", "target_users": ["교수자", "조교"], "source_path": ""}, {"id": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "label": "오프라인으로 채점한 과제나 시험 점수를 new eTL에 입력하려면 어떻게 해야 하나요?", "type": "Topic", "document_id": "003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "topic_index": 0, "document_title": "오프라인 과제/시험 점수를 new eTL에 입력하기", "guide_area": "과제, 시험, 성적", "target_users": ["교수자", "조교"], "user_question": "오프라인으로 채점한 과제나 시험 점수를 new eTL에 입력하려면 어떻게 해야 하나요?", "task": "오프라인 과제/시험용 과제 생성 및 성적 수기 입력", "screen_path": ["모듈(주차학습)", "과제 - 새 과제", "과제 편집", "성적"], "procedure": ["모듈(주차학습) 메뉴에서 학습자가 제출한 주차의 모듈을 찾는다", "해당 모듈 좌측의 + 버튼을 클릭한다", "과제 - 새 과제를 선택하고 과제 이름을 입력한 뒤 항목 추가를 한다", "생성한 과제를 열고 편집 버튼을 클릭한다", "과제 설명을 입력하고 배점을 설정한 뒤 제출물 유형을 오프라인 제출로 선택한다", "학습자가 혼동하지 않도록 마감 일정을 과거로 설정한다", "저장 & 공개를 클릭한다", "성적 메뉴에서 오프라인 과제와 학습자 이름이 교차하는 셀을 클릭해 점수를 입력한다", "필요하면 화살표(→) 버튼을 눌러 상세 정보 트레이에서 코멘트를 등록한다"], "settings": ["과제 이름", "과제 설명", "배점", "제출물 유형: 오프라인 제출", "마감 일정: 과거 날짜", "점수", "코멘트"], "cautions": ["오프라인에서 진행한 시험(퀴즈)도 과제 유형으로 생성해 점수를 입력할 수 있다", "학습자가 실제로 제출하지 않도록 마감 일정을 과거로 설정해야 한다", "점수 입력 후 반영까지 시간이 다소 걸릴 수 있으며, 새로고침으로 확인할 수 있다"], "expected_result": "오프라인 과제 또는 시험용 과제가 생성되고, 성적 메뉴에서 학습자별 점수와 코멘트를 입력할 수 있다."}, {"id": "Outcome::오프라인 과제 또는 시험용 과제가 생성되고, 성적 메뉴에서 학습자별 점수와 코멘트를 입력할 수 있다", "label": "오프라인 과제 또는 시험용 과제가 생성되고, 성적 메뉴에서 학습자별 점수와 코멘트를 입력할 수 있다", "type": "Outcome"}, {"id": "screen::과제 - 새 과제", "label": "과제 - 새 과제", "type": "Screen"}, {"id": "screen::과제 편집", "label": "과제 편집", "type": "Screen"}, {"id": "screen::성적", "label": "성적", "type": "Screen"}, {"id": "screen::상세 정보 트레이", "label": "상세 정보 트레이", "type": "Screen"}, {"id": "task::오프라인 과제/시험용 과제 생성", "label": "오프라인 과제/시험용 과제 생성", "type": "Task"}, {"id": "task::성적 수기 입력", "label": "성적 수기 입력", "type": "Task"}, {"id": "task::점수 입력", "label": "점수 입력", "type": "Task"}, {"id": "task::코멘트 등록", "label": "코멘트 등록", "type": "Task"}, {"id": "task::저장 & 공개", "label": "저장 & 공개", "type": "Task"}, {"id": "setting::과제 이름", "label": "과제 이름", "type": "Setting"}, {"id": "setting::과제 설명", "label": "과제 설명", "type": "Setting"}, {"id": "setting::배점", "label": "배점", "type": "Setting"}, {"id": "setting::제출물 유형: 오프라인 제출", "label": "제출물 유형: 오프라인 제출", "type": "Setting"}, {"id": "setting::마감 일정: 과거 날짜", "label": "마감 일정: 과거 날짜", "type": "Setting"}, {"id": "setting::점수", "label": "점수", "type": "Setting"}, {"id": "setting::코멘트", "label": "코멘트", "type": "Setting"}, {"id": "Document::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md", "label": "과제 제출물 일괄 다운로드가 불가합니다", "type": "Document", "document_id": "004_Q._과제_제출물_일괄_다운로드가_불가합니다.md", "guide_area": "과제", "target_users": ["교수자", "조교"], "source_path": ""}, {"id": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "label": "과제 제출물 일괄 다운로드가 중간에 멈출 때 어떻게 해결하나요?", "type": "Topic", "document_id": "004_Q._과제_제출물_일괄_다운로드가_불가합니다.md", "topic_index": 0, "document_title": "과제 제출물 일괄 다운로드가 불가합니다", "guide_area": "과제", "target_users": ["교수자", "조교"], "user_question": "과제 제출물 일괄 다운로드가 중간에 멈출 때 어떻게 해결하나요?", "task": "과제 제출물 일괄 다운로드 오류 원인 확인 및 우회 처리", "screen_path": ["과제", "제출물 목록", "일괄 다운로드", "SpeedGrader 미리보기 뷰어"], "procedure": ["제출물에 확장자가 없거나 특수 문자, 기호가 포함된 파일이 섞여 있는지 확인한다.", "문제가 되는 파일이 있으면 교수자와 협의해 해당 파일을 임의로 삭제한 뒤 다시 다운로드를 시도한다.", "특수 문자나 기호가 포함된 과제물은 PDF나 JPG처럼 이미지화한 파일로 다시 제출하도록 안내한다.", "제출물의 개별 파일 용량이 크거나 제출물이 많아 일괄 다운로드가 불안정하면 SpeedGrader 미리보기 뷰어로 채점하도록 안내한다.", "대량 다운로드가 꼭 필요하면 일괄 다운로드 대신 개별 다운로드로 진행한다."], "settings": ["확장자 없는 파일", "특수 문자/기호 포함 파일", "대량 제출물", "개별 파일 용량", "WORD", "PDF", "JPG", "PNG", "EXCEL"], "cautions": ["학내 웹 방화벽 정책에 의해 특수 문자나 일부 기호가 차단될 수 있다.", "문제 파일의 삭제는 학교 내부 및 해당 과목 교수자와 협의 후 진행해야 한다.", "HWP/HWPX 대신 WORD 또는 PDF 제출을 유도하는 것이 안전하다.", "원문은 원인과 대응 방안을 설명하며, 별도의 시스템 설정 변경 방법은 제시하지 않는다."], "expected_result": "문제가 되는 파일을 제거하거나 제출 형식을 조정한 뒤 과제 제출물을 정상적으로 확인하거나 다운로드할 수 있다."}, {"id": "Outcome::문제가 되는 파일을 제거하거나 제출 형식을 조정한 뒤 과제 제출물을 정상적으로 확인하거나 다운로드할 수 있다", "label": "문제가 되는 파일을 제거하거나 제출 형식을 조정한 뒤 과제 제출물을 정상적으로 확인하거나 다운로드할 수 있다", "type": "Outcome"}, {"id": "screen::제출물 목록", "label": "제출물 목록", "type": "Screen"}, {"id": "screen::일괄 다운로드", "label": "일괄 다운로드", "type": "Screen"}, {"id": "screen::SpeedGrader 미리보기 뷰어", "label": "SpeedGrader 미리보기 뷰어", "type": "Screen"}, {"id": "task::과제 제출물 일괄 다운로드 오류 원인 확인", "label": "과제 제출물 일괄 다운로드 오류 원인 확인", "type": "Task"}, {"id": "task::문제가 되는 파일 삭제 후 다시 다운로드", "label": "문제가 되는 파일 삭제 후 다시 다운로드", "type": "Task"}, {"id": "task::특수 문자나 기호가 포함된 과제물 재제출 안내", "label": "특수 문자나 기호가 포함된 과제물 재제출 안내", "type": "Task"}, {"id": "task::SpeedGrader 미리보기 뷰어로 채점", "label": "SpeedGrader 미리보기 뷰어로 채점", "type": "Task"}, {"id": "task::일괄 다운로드 대신 개별 다운로드로 진행", "label": "일괄 다운로드 대신 개별 다운로드로 진행", "type": "Task"}, {"id": "setting::확장자 없는 파일", "label": "확장자 없는 파일", "type": "Setting"}, {"id": "setting::특수 문자/기호 포함 파일", "label": "특수 문자/기호 포함 파일", "type": "Setting"}, {"id": "setting::대량 제출물", "label": "대량 제출물", "type": "Setting"}, {"id": "setting::개별 파일 용량", "label": "개별 파일 용량", "type": "Setting"}, {"id": "setting::WORD", "label": "WORD", "type": "Setting"}, {"id": "setting::PDF", "label": "PDF", "type": "Setting"}, {"id": "setting::JPG", "label": "JPG", "type": "Setting"}, {"id": "setting::PNG", "label": "PNG", "type": "Setting"}, {"id": "setting::EXCEL", "label": "EXCEL", "type": "Setting"}, {"id": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "label": "CSV 파일로 과제/시험 성적을 일괄 등록하려면 어떻게 하나요?", "type": "Topic", "document_id": "003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "topic_index": 1, "document_title": "오프라인 과제/시험 점수를 new eTL에 입력하기", "guide_area": "과제, 시험, 성적", "target_users": ["교수자", "조교"], "user_question": "CSV 파일로 과제/시험 성적을 일괄 등록하려면 어떻게 하나요?", "task": "성적 CSV 내보내기 후 수정·재업로드로 일괄 등록", "screen_path": ["성적", "작업", "내보내기", "가져오기", "파일 선택", "데이터 업로드"], "procedure": ["성적 메뉴에서 작업 → 내보내기를 눌러 성적 CSV 파일을 다운로드한다", "CSV 파일에서 성적을 입력하거나 기존 점수를 수정한다", "다른 이름으로 저장할 때 파일 형식을 CSV UTF-8(쉼표로 분리)(*.csv)로 저장한다", "성적 메뉴에서 작업 → 가져오기를 클릭한다", "파일 선택 버튼으로 업로드할 CSV 파일을 선택한다", "데이터 업로드 버튼을 눌러 파일 데이터를 업로드한다", "성적 데이터를 점검한 뒤 변경 내용 저장 버튼을 눌러 마무리한다"], "settings": ["CSV UTF-8(쉼표로 분리)(*.csv)", "작업 메뉴", "파일 선택", "데이터 업로드", "변경 내용 저장"], "cautions": ["성적 데이터 반영까지 시간이 걸릴 수 있다", "반영 후에는 페이지를 새로고침해 확인해야 한다"], "expected_result": "CSV 파일을 이용해 여러 학생의 성적을 한 번에 등록하거나 수정한 내용이 성적 메뉴에 반영된다."}, {"id": "Outcome::CSV 파일로 여러 학생의 성적을 한 번에 등록하거나 수정한 내용이 성적 메뉴에 반영된다", "label": "CSV 파일로 여러 학생의 성적을 한 번에 등록하거나 수정한 내용이 성적 메뉴에 반영된다", "type": "Outcome"}, {"id": "screen::작업", "label": "작업", "type": "Screen"}, {"id": "screen::내보내기", "label": "내보내기", "type": "Screen"}, {"id": "screen::가져오기", "label": "가져오기", "type": "Screen"}, {"id": "screen::파일 선택", "label": "파일 선택", "type": "Screen"}, {"id": "screen::데이터 업로드", "label": "데이터 업로드", "type": "Screen"}, {"id": "screen::변경 내용 저장", "label": "변경 내용 저장", "type": "Screen"}, {"id": "task::성적 CSV 파일 다운로드", "label": "성적 CSV 파일 다운로드", "type": "Task"}, {"id": "task::CSV 파일에 성적 입력 또는 수정", "label": "CSV 파일에 성적 입력 또는 수정", "type": "Task"}, {"id": "task::CSV UTF-8 형식으로 저장", "label": "CSV UTF-8 형식으로 저장", "type": "Task"}, {"id": "task::CSV 파일 업로드", "label": "CSV 파일 업로드", "type": "Task"}, {"id": "task::성적 데이터 점검", "label": "성적 데이터 점검", "type": "Task"}, {"id": "task::변경 내용 저장", "label": "변경 내용 저장", "type": "Task"}, {"id": "setting::CSV UTF-8(쉼표로 분리)(*.csv", "label": "CSV UTF-8(쉼표로 분리)(*.csv", "type": "Setting"}, {"id": "setting::작업 메뉴", "label": "작업 메뉴", "type": "Setting"}, {"id": "setting::파일 선택", "label": "파일 선택", "type": "Setting"}, {"id": "setting::데이터 업로드", "label": "데이터 업로드", "type": "Setting"}, {"id": "setting::변경 내용 저장", "label": "변경 내용 저장", "type": "Setting"}], "edges": [{"source": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "target": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "relation": "HAS_TOPIC"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "Outcome::과목별 온라인 강의실 화면과 메뉴 구성이 완료된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "screen::과목 강의실", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "screen::과목 홈", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "screen::과목 메뉴 설정하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "task::과목 강의실 기본 설정", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "task::메뉴 구성 설정", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "task::강의실 환경 정리", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "setting::과목 홈", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "setting::과목 메뉴", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::0", "target": "setting::과목 운영", "relation": "USES_SETTING"}, {"source": "Document::001_FAQ_모음.md", "target": "Topic::001_FAQ_모음.md::0", "relation": "HAS_TOPIC"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "Outcome::선택한 주제의 상세 가이드 문서로 이동할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "screen::FAQ 모음", "relation": "USES_SCREEN"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "screen::과제/토론/퀴즈/학습 자료/사용자/시험/알림 링크", "relation": "USES_SCREEN"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "task::주제별 안내 문서 찾기", "relation": "HAS_TASK"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "task::원하는 주제 링크 클릭", "relation": "HAS_TASK"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "task::세부 가이드 열기", "relation": "HAS_TASK"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::과제", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::토론", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::퀴즈", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::학습 자료", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::사용자", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::시험", "relation": "USES_SETTING"}, {"source": "Topic::001_FAQ_모음.md::0", "target": "setting::알림", "relation": "USES_SETTING"}, {"source": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "target": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "relation": "HAS_TOPIC"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "Outcome::선택한 사용자가 해당 과목에 조교 또는 청강생으로 등록된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "screen::시작하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "screen::사용자(조교, 청강생) 수동 등록", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "screen::사용자 등록 관련 안내 페이지", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "task::조교 또는 청강생을 수동 등록", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "task::사용자 등록 관련 안내 페이지를 열기", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "task::등록 결과 확인", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "setting::사용자 유형", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "setting::조교", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::1", "target": "setting::청강생", "relation": "USES_SETTING"}, {"source": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "target": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "relation": "HAS_TOPIC"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "Outcome::선택한 방식으로 수강생에게 공지나 알림이 전달된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "screen::공지/수강생 알림", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "screen::공지사항(공지, 쪽지, 문자, 메일) 안내", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "screen::공지", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "screen::수강생 알림", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "task::공지 또는 수강생 알림 기능 선택", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "task::전달할 내용 작성", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "task::알림 발송", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "setting::공지", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "setting::쪽지", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "setting::문자", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::2", "target": "setting::메일", "relation": "USES_SETTING"}, {"source": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "target": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "relation": "HAS_TOPIC"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "Outcome::과목 내에 게시판이 생성되고 게시글을 운영할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "screen::게시판", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "screen::게시판 생성하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "screen::게시글 작성하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "screen::게시글 관리하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "task::게시판 생성", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "task::게시글 작성", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "task::게시글 수정", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "task::게시글 관리", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "setting::게시판", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::3", "target": "setting::게시글", "relation": "USES_SETTING"}, {"source": "Document::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md", "target": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "relation": "HAS_TOPIC"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "Outcome::모듈 또는 주차학습 안에 원하는 학습 활동과 요소가 추가된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::모듈(주차학습", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 활동 - 과제 추가하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 활동 - 퀴즈 추가하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 활동 - 토론 추가하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 활동 - 파일 추가하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 요소 - 화상강의 추가하기", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "screen::학습 활동 - 오프라인 출결(수동 출결", "relation": "USES_SCREEN"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "task::모듈 또는 주차학습에 학습 활동/요소 추가", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "task::추가하려는 학습 활동 또는 학습 요소 선택", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "task::각 활동에 맞는 설정 입력", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "task::저장", "relation": "HAS_TASK"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::과제", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::퀴즈", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::토론", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::파일", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::화상강의", "relation": "USES_SETTING"}, {"source": "Topic::000_📑서울대학교_new_eTL_상세_가이드_(교수자용).md::4", "target": "setting::오프라인 출결", "relation": "USES_SETTING"}, {"source": "Document::002_과제.md", "target": "Topic::002_과제.md::0", "relation": "HAS_TOPIC"}, {"source": "Topic::002_과제.md::0", "target": "Outcome::학생별 오프라인 과제 또는 시험 점수가 new eTL에 반영된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::002_과제.md::0", "target": "screen::과제 관련 화면", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::0", "target": "screen::성적 입력", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::0", "target": "task::오프라인 과제/시험 점수 입력", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::0", "target": "task::대상 학생의 점수 입력", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::0", "target": "task::입력 내용 저장", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::0", "target": "setting::학생별 점수", "relation": "USES_SETTING"}, {"source": "Topic::002_과제.md::0", "target": "setting::과제 또는 시험 항목", "relation": "USES_SETTING"}, {"source": "Document::002_과제.md", "target": "Topic::002_과제.md::2", "relation": "HAS_TOPIC"}, {"source": "Topic::002_과제.md::2", "target": "Outcome::피어리뷰 과제의 학생별 완료 및 미완료 상태를 확인할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::002_과제.md::2", "target": "screen::과제", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::2", "target": "screen::피어리뷰", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::2", "target": "screen::학생별 상태 확인", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::2", "target": "screen::상태 확인 화면", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::2", "target": "task::피어리뷰 과제 완료/미완료 상태 확인", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::2", "target": "task::학생별 완료 여부 확인", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::2", "target": "task::미완료 학생 구분", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::2", "target": "setting::완료", "relation": "USES_SETTING"}, {"source": "Topic::002_과제.md::2", "target": "setting::미완료", "relation": "USES_SETTING"}, {"source": "Topic::002_과제.md::2", "target": "setting::학생별 상태", "relation": "USES_SETTING"}, {"source": "Document::002_과제.md", "target": "Topic::002_과제.md::1", "relation": "HAS_TOPIC"}, {"source": "Topic::002_과제.md::1", "target": "Outcome::과제 제출물 다운로드 가능 여부와 대안 절차를 확인할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::002_과제.md::1", "target": "screen::과제", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::1", "target": "screen::제출물 다운로드", "relation": "USES_SCREEN"}, {"source": "Topic::002_과제.md::1", "target": "task::과제 제출물 일괄 다운로드 문제 확인", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::1", "target": "task::과제 제출물 다운로드 기능 확인", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::1", "target": "task::일괄 다운로드 제한 조건 검토", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::1", "target": "task::개별 다운로드 또는 다른 안내 절차 확인", "relation": "HAS_TASK"}, {"source": "Topic::002_과제.md::1", "target": "setting::제출물 다운로드", "relation": "USES_SETTING"}, {"source": "Topic::002_과제.md::1", "target": "setting::일괄 다운로드", "relation": "USES_SETTING"}, {"source": "Document::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "target": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "relation": "HAS_TOPIC"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "Outcome::오프라인 과제 또는 시험용 과제가 생성되고, 성적 메뉴에서 학습자별 점수와 코멘트를 입력할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "screen::모듈(주차학습", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "screen::과제 - 새 과제", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "screen::과제 편집", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "screen::성적", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "screen::상세 정보 트레이", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "task::오프라인 과제/시험용 과제 생성", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "task::성적 수기 입력", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "task::점수 입력", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "task::코멘트 등록", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "task::저장 & 공개", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::과제 이름", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::과제 설명", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::배점", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::제출물 유형: 오프라인 제출", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::마감 일정: 과거 날짜", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::점수", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::0", "target": "setting::코멘트", "relation": "USES_SETTING"}, {"source": "Document::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md", "target": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "relation": "HAS_TOPIC"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "Outcome::문제가 되는 파일을 제거하거나 제출 형식을 조정한 뒤 과제 제출물을 정상적으로 확인하거나 다운로드할 수 있다", "relation": "HAS_OUTCOME"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "screen::과제", "relation": "USES_SCREEN"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "screen::제출물 목록", "relation": "USES_SCREEN"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "screen::일괄 다운로드", "relation": "USES_SCREEN"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "screen::SpeedGrader 미리보기 뷰어", "relation": "USES_SCREEN"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "task::과제 제출물 일괄 다운로드 오류 원인 확인", "relation": "HAS_TASK"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "task::문제가 되는 파일 삭제 후 다시 다운로드", "relation": "HAS_TASK"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "task::특수 문자나 기호가 포함된 과제물 재제출 안내", "relation": "HAS_TASK"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "task::SpeedGrader 미리보기 뷰어로 채점", "relation": "HAS_TASK"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "task::일괄 다운로드 대신 개별 다운로드로 진행", "relation": "HAS_TASK"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::확장자 없는 파일", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::특수 문자/기호 포함 파일", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::대량 제출물", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::개별 파일 용량", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::WORD", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::PDF", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::JPG", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::PNG", "relation": "USES_SETTING"}, {"source": "Topic::004_Q._과제_제출물_일괄_다운로드가_불가합니다.md::0", "target": "setting::EXCEL", "relation": "USES_SETTING"}, {"source": "Document::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md", "target": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "relation": "HAS_TOPIC"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "Outcome::CSV 파일로 여러 학생의 성적을 한 번에 등록하거나 수정한 내용이 성적 메뉴에 반영된다", "relation": "HAS_OUTCOME"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::성적", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::작업", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::내보내기", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::가져오기", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::파일 선택", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::데이터 업로드", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "screen::변경 내용 저장", "relation": "USES_SCREEN"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::성적 CSV 파일 다운로드", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::CSV 파일에 성적 입력 또는 수정", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::CSV UTF-8 형식으로 저장", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::CSV 파일 업로드", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::성적 데이터 점검", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "task::변경 내용 저장", "relation": "HAS_TASK"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "setting::CSV UTF-8(쉼표로 분리)(*.csv", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "setting::작업 메뉴", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "setting::파일 선택", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "setting::데이터 업로드", "relation": "USES_SETTING"}, {"source": "Topic::003_Q._오프라인_과제_시험_점수를_new_eTL에_입력하고_싶습니다.md::1", "target": "setting::변경 내용 저장", "relation": "USES_SETTING"}]}</script>
+  <script type="module">
+    import Graph from "https://esm.sh/graphology@0.26.0";
+    import Sigma from "https://esm.sh/sigma@3";
+    import forceAtlas2 from "https://esm.sh/graphology-layout-forceatlas2@0.10.1";
+
+    const raw = JSON.parse(document.getElementById("graph-data").textContent);
+    const nodes = raw.nodes;
+    const edges = raw.edges;
+    const nodeById = new Map(nodes.map(node => [node.id, node]));
+
+    const colors = {
+      Document: "#7bd88f",
+      Topic: "#f7b267",
+      Screen: "#66c2ff",
+      Task: "#ff8fab",
+      Setting: "#d0a2f7",
+      Outcome: "#ffd166",
+    };
+    const sizes = {
+      Document: 6,
+      Topic: 5,
+      Screen: 4,
+      Task: 4,
+      Setting: 4,
+      Outcome: 5,
+    };
+    const relationColors = {
+      SIMILAR_TO: "rgba(140, 170, 190, 0.35)",
+      HAS_ISSUE: "rgba(247, 178, 103, 0.45)",
+      HAS_OUTCOME: "rgba(255, 209, 102, 0.5)",
+      INVOLVES_CONCEPT: "rgba(102, 194, 255, 0.35)",
+      HAS_FACT_PATTERN: "rgba(255, 143, 171, 0.35)",
+      HAS_EVIDENCE_TYPE: "rgba(208, 162, 247, 0.35)",
+    };
+
+    const relationTypes = [...new Set(edges.map(edge => edge.relation))].sort();
+    const adjacency = new Map();
+    for (const edge of edges) {
+      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+      if (!adjacency.has(edge.target)) adjacency.set(edge.target, []);
+      adjacency.get(edge.source).push({ ...edge, other: edge.target, direction: "out" });
+      adjacency.get(edge.target).push({ ...edge, other: edge.source, direction: "in" });
+    }
+
+    document.getElementById("nodeCount").textContent = nodes.length.toLocaleString();
+    document.getElementById("edgeCount").textContent = edges.length.toLocaleString();
+
+    const relationChecks = document.getElementById("relationChecks");
+    for (const relation of relationTypes) {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" value="${relation}" checked /> ${relation}`;
+      relationChecks.appendChild(label);
+    }
+
+    const legend = document.getElementById("legend");
+    for (const [type, color] of Object.entries(colors)) {
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.innerHTML = `<span class="dot" style="background:${color}"></span>${type}`;
+      legend.appendChild(chip);
+    }
+
+    let renderer = null;
+    let currentGraph = null;
+    let selectedNode = null;
+    let lastMatches = [];
+
+    function allowedRelations() {
+      return new Set([...relationChecks.querySelectorAll("input:checked")].map(input => input.value));
+    }
+
+    function searchNodes() {
+      const q = document.getElementById("search").value.trim().toLowerCase();
+      const type = document.getElementById("typeFilter").value;
+      const results = nodes
+        .filter(node => !type || node.type === type)
+        .filter(node => !q || node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q))
+        .slice(0, 30);
+      lastMatches = results;
+      renderResults(results);
+      return results;
+    }
+
+    function renderResults(results) {
+      const el = document.getElementById("results");
+      el.innerHTML = "";
+      for (const node of results) {
+        const item = document.createElement("div");
+        item.className = "result";
+        item.innerHTML = `<div class="label">${escapeHtml(node.label)}</div><div class="meta">${node.type} · ${escapeHtml(node.id)}</div>`;
+        item.addEventListener("click", () => renderNeighborhood(node.id));
+        el.appendChild(item);
+      }
+      if (!results.length) el.innerHTML = "<p>No matches.</p>";
+    }
+
+    function collectNeighborhood(seedId) {
+      const depth = Number(document.getElementById("depth").value || 2);
+      const maxNodes = Number(document.getElementById("maxNodes").value || 260);
+      const relations = allowedRelations();
+      const visited = new Set([seedId]);
+      const queue = [{ id: seedId, depth: 0 }];
+      const edgeSet = new Set();
+
+      while (queue.length && visited.size < maxNodes) {
+        const current = queue.shift();
+        if (current.depth >= depth) continue;
+        const incident = adjacency.get(current.id) || [];
+        incident.sort((a, b) => relationRank(a.relation) - relationRank(b.relation));
+        for (const edge of incident) {
+          if (!relations.has(edge.relation)) continue;
+          edgeSet.add(edgeKey(edge));
+          if (!visited.has(edge.other)) {
+            visited.add(edge.other);
+            queue.push({ id: edge.other, depth: current.depth + 1 });
+            if (visited.size >= maxNodes) break;
+          }
+        }
+      }
+
+      const visibleEdges = edges.filter(edge =>
+        visited.has(edge.source) &&
+        visited.has(edge.target) &&
+        relations.has(edge.relation) &&
+        edgeSet.has(edgeKey(edge))
+      );
+      return { nodeIds: [...visited], visibleEdges };
+    }
+
+    function relationRank(relation) {
+      return relation === "SIMILAR_TO" ? 5 : 1;
+    }
+
+    function edgeKey(edge) {
+      return `${edge.source}--${edge.relation}--${edge.target}--${edge.weight || ""}`;
+    }
+
+    function renderNeighborhood(seedId) {
+      const seed = nodeById.get(seedId);
+      if (!seed) return;
+      selectedNode = seedId;
+
+      const { nodeIds, visibleEdges } = collectNeighborhood(seedId);
+      const graph = new Graph({ multi: true, type: "directed" });
+      const byTypeIndex = new Map();
+
+      for (const id of nodeIds) {
+        const node = nodeById.get(id);
+        const typeIndex = byTypeIndex.get(node.type) || 0;
+        byTypeIndex.set(node.type, typeIndex + 1);
+        const angle = typeIndex * 2.399963 + typeRadius(node.type);
+        const radius = 10 + typeIndex * 0.08 + typeRadius(node.type);
+        graph.addNode(id, {
+          label: node.label,
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius,
+          size: sizes[node.type] || 4,
+          color: colors[node.type] || "#ddd",
+          nodeType: node.type,
+          original: node,
+          forceLabel: id === seedId || node.type === "Outcome",
+          zIndex: id === seedId ? 10 : 1,
+        });
+      }
+
+      let edgeIndex = 0;
+      for (const edge of visibleEdges) {
+        if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) continue;
+        graph.addDirectedEdgeWithKey(`e${edgeIndex++}`, edge.source, edge.target, {
+          label: edge.relation,
+          relation: edge.relation,
+          size: edge.relation === "SIMILAR_TO" ? 1 : 1.6,
+          color: relationColors[edge.relation] || "rgba(255,255,255,.22)",
+          weight: edge.weight,
+        });
+      }
+
+      if (graph.order > 2) {
+        forceAtlas2.assign(graph, {
+          iterations: graph.order < 120 ? 120 : 70,
+          settings: {
+            gravity: 1,
+            scalingRatio: 12,
+            slowDown: 2,
+            strongGravityMode: false,
+            barnesHutOptimize: graph.order > 120,
+            barnesHutTheta: 0.6,
+          },
+        });
+      }
+
+      if (renderer) renderer.kill();
+      currentGraph = graph;
+      renderer = new Sigma(graph, document.getElementById("container"), {
+        renderEdgeLabels: false,
+        zIndex: true,
+        labelDensity: 0.08,
+        labelGridCellSize: 90,
+        labelColor: { color: "#e8edf2" },
+        defaultEdgeType: "line",
+        nodeReducer: (node, data) => {
+          if (!selectedNode) return data;
+          if (node === selectedNode) return { ...data, size: data.size * 1.8, color: "#ffffff", forceLabel: true };
+          return data;
+        },
+      });
+
+      renderer.on("clickNode", event => {
+        selectedNode = event.node;
+        renderer.refresh();
+        renderDetails(event.node);
+      });
+
+      renderDetails(seedId);
+      document.getElementById("subgraphStats").textContent =
+        `${graph.order.toLocaleString()} nodes · ${graph.size.toLocaleString()} edges · seed: ${seed.label}`;
+    }
+
+    function typeRadius(type) {
+      return {
+        Document: 3,
+        Topic: 7,
+        Screen: 11,
+        Task: 15,
+        Setting: 19,
+        Outcome: 23,
+      }[type] || 10;
+    }
+
+    function renderDetails(id) {
+      const node = nodeById.get(id);
+      if (!node) return;
+
+      const details = document.getElementById("details");
+      const fields = Object.entries(node)
+        .filter(([key]) => !["id", "label"].includes(key))
+        .map(([key, value]) => `<div class="kv"><div class="k">${escapeHtml(key)}</div><div class="v">${escapeHtml(String(value))}</div></div>`)
+        .join("");
+      details.innerHTML = `<h3 class="detail-title">${escapeHtml(node.label)}</h3><div class="kv"><div class="k">id</div><div class="v">${escapeHtml(node.id)}</div></div>${fields}`;
+
+      const neighborEl = document.getElementById("neighbors");
+      neighborEl.innerHTML = "";
+      const seen = new Set();
+      for (const edge of adjacency.get(id) || []) {
+        if (!currentGraph || !currentGraph.hasNode(edge.other) || seen.has(edge.other)) continue;
+        seen.add(edge.other);
+        const other = nodeById.get(edge.other);
+        const div = document.createElement("div");
+        div.className = "neighbor";
+        div.textContent = `${edge.relation} · ${other.type} · ${other.label}`;
+        div.addEventListener("click", () => {
+          selectedNode = other.id;
+          renderer.refresh();
+          renderDetails(other.id);
+        });
+        neighborEl.appendChild(div);
+      }
+      if (!seen.size) neighborEl.innerHTML = "<p>No visible neighbors.</p>";
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[ch]));
+    }
+
+    document.getElementById("search").addEventListener("input", searchNodes);
+    document.getElementById("typeFilter").addEventListener("change", searchNodes);
+    document.getElementById("renderBtn").addEventListener("click", () => {
+      const seed = lastMatches[0];
+      if (seed) renderNeighborhood(seed.id);
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => renderer?.getCamera().animatedReset());
+    relationChecks.addEventListener("change", () => {
+      if (selectedNode) renderNeighborhood(selectedNode);
+    });
+
+    const initial = searchNodes()[0] || nodes[0];
+    renderNeighborhood(initial.id);
+  </script>
+</body>
+</html>
